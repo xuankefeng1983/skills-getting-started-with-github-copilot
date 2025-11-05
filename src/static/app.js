@@ -4,6 +4,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
 
+  // Hide bullet points for participants lists
+  // (additional CSS adjustments are in styles.css)
+
   // Function to fetch activities from API
   async function fetchActivities() {
     try {
@@ -49,7 +52,7 @@ document.addEventListener("DOMContentLoaded", () => {
         availP.append(` ${spotsLeft} spots left`);
         activityCard.appendChild(availP);
 
-        // Participants section
+  // Participants section
         const participantsWrap = document.createElement("div");
         participantsWrap.className = "participants";
 
@@ -64,7 +67,22 @@ document.addEventListener("DOMContentLoaded", () => {
           details.participants.forEach((p) => {
             const li = document.createElement("li");
             li.className = "participant-item";
-            li.textContent = p; // safe text insertion
+
+            const nameSpan = document.createElement("span");
+            nameSpan.textContent = p; // participant email/name
+
+            const deleteIcon = document.createElement("span");
+            deleteIcon.className = "delete-icon";
+            deleteIcon.setAttribute('role', 'button');
+            deleteIcon.setAttribute('aria-label', `Unregister ${p} from ${name}`);
+            deleteIcon.title = `Unregister ${p}`;
+            deleteIcon.textContent = "🗑️";
+            deleteIcon.addEventListener('click', async () => {
+              await unregisterParticipant(name, p);
+            });
+
+            li.appendChild(nameSpan);
+            li.appendChild(deleteIcon);
             ul.appendChild(li);
           });
           participantsWrap.appendChild(ul);
@@ -91,6 +109,34 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Function to unregister participant (calls backend DELETE endpoint)
+  async function unregisterParticipant(activityName, email) {
+    try {
+      const res = await fetch(
+        `/activities/${encodeURIComponent(activityName)}/participants?email=${encodeURIComponent(email)}`,
+        { method: 'DELETE' }
+      );
+
+      const result = await res.json();
+      if (res.ok) {
+        messageDiv.textContent = result.message || 'Participant removed';
+        messageDiv.className = 'message success';
+      } else {
+        messageDiv.textContent = result.detail || 'Failed to remove participant';
+        messageDiv.className = 'message error';
+      }
+      messageDiv.classList.remove('hidden');
+      setTimeout(() => messageDiv.classList.add('hidden'), 4000);
+      // Refresh activities list to reflect change
+      fetchActivities();
+    } catch (error) {
+      console.error('Error unregistering participant:', error);
+      messageDiv.textContent = 'Error removing participant';
+      messageDiv.className = 'message error';
+      messageDiv.classList.remove('hidden');
+    }
+  }
+
   // Handle form submission
   signupForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -110,11 +156,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (response.ok) {
         messageDiv.textContent = result.message;
-        messageDiv.className = "success";
+        messageDiv.className = "message success";
         signupForm.reset();
+        // Refresh activities so the newly signed-up participant appears immediately
+        await fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
-        messageDiv.className = "error";
+        messageDiv.className = "message error";
       }
 
       messageDiv.classList.remove("hidden");
@@ -125,7 +173,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 5000);
     } catch (error) {
       messageDiv.textContent = "Failed to sign up. Please try again.";
-      messageDiv.className = "error";
+      messageDiv.className = "message error";
       messageDiv.classList.remove("hidden");
       console.error("Error signing up:", error);
     }
